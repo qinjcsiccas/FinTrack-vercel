@@ -690,25 +690,29 @@
             Plotly.newPlot('trend-chart', [trace1, trace2], layout, config);
             
             const monthlyData = calculateMonthlyData(state.df);
-            console.log('monthlyData:', monthlyData);
+            
+            // 确保容器有高度
+            const monthlyContainer = document.getElementById('monthly-chart');
+            monthlyContainer.style.height = '350px';
+            
             const colors = monthlyData.map(d => d.change >= 0 ? '#4caf50' : '#f44336');
             
             const traceMonthly = {
                 x: monthlyData.map(d => d.month),
-                y: monthlyData.map(d => state.privacyMode ? 0 : d.change),
+                y: monthlyData.map(d => d.change),
                 type: 'bar',
                 marker: { color },
                 name: '净盈亏'
             };
             
             const layoutMonthly = {
-                margin: { l: 40, r: 0, t: 30, b: 40 },
+                margin: { l: 50, r: 20, t: 30, b: 40 },
                 xaxis: { title: '月份' },
                 yaxis: { 
-                    showticklabels: !state.privacyMode,
-                    title: state.privacyMode ? '****' : '净盈亏 (元)'
+                    title: '净盈亏 (元)'
                 },
-                hovermode: 'closest'
+                hovermode: 'closest',
+                height: 350
             };
             
             Plotly.newPlot('monthly-chart', [traceMonthly], layoutMonthly, config);
@@ -718,7 +722,6 @@
             if (!state.df || state.df.length === 0) return;
             
             const velocityData = calculateVelocity(state.df, state.velocityStep);
-            console.log('velocityData:', velocityData);
             
             if (velocityData.length > 0) {
                 const traceV = {
@@ -746,7 +749,6 @@
             }
             
             const yearlyData = calculateYearlyVelocity(state.df);
-            console.log('yearlyData:', yearlyData);
             
             if (yearlyData.length > 0) {
                 const traceY = {
@@ -782,12 +784,10 @@
                     tagStats[row.Tag] += row.Change;
                 }
             });
-            console.log('tagStats:', tagStats);
             
             const sortedTags = Object.entries(tagStats)
                 .sort((a, b) => a[1] - b[1])
                 .slice(0, 20);
-            console.log('sortedTags:', sortedTags);
             
             const traceCat = {
                 y: sortedTags.map(d => d[0]),
@@ -839,7 +839,6 @@
             
             const currStage = state.df[state.df.length - 1].Stage;
             document.getElementById('forecast-title').textContent = `🚀 基于【${currStage}】的里程碑预测`;
-            console.log('currStage:', currStage);
             
             const stageData = state.df.filter(r => r.Stage === currStage);
             let stageVelocity = 0;
@@ -849,11 +848,9 @@
                 const stageDays = Math.max(1, Math.floor((stageData[stageData.length - 1].Date - stageData[0].Date) / (24 * 60 * 60 * 1000)));
                 stageVelocity = stageGrowth / stageDays;
             }
-            console.log('stageVelocity:', stageVelocity);
             
             const currTotal = state.df[state.df.length - 1].Total_Assets;
             const remaining = state.targetGoal - currTotal;
-            console.log('currTotal:', currTotal, 'remaining:', remaining);
             const resultDiv = document.getElementById('forecast-result');
             
             if (stageVelocity > 0 && remaining > 0) {
@@ -885,7 +882,6 @@
             }
             
             const seasonalData = calculateSeasonalData(state.df);
-            console.log('seasonalData:', seasonalData);
             const years = Object.keys(seasonalData).sort();
             const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
             
@@ -983,6 +979,14 @@
                 tab.classList.add('active');
                 const targetTab = document.getElementById('tab-' + tab.dataset.tab);
                 targetTab.classList.remove('hidden');
+                
+                // 设置页隐藏KPI，其他页显示
+                const kpiSection = document.getElementById('kpi-section');
+                if (tab.dataset.tab === 'settings') {
+                    kpiSection.classList.add('hidden');
+                } else {
+                    kpiSection.classList.remove('hidden');
+                }
                 
                 // 切换tab后重新绘制该tab的图表
                 setTimeout(() => {
