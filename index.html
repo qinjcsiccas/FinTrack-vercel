@@ -489,49 +489,66 @@
             df.forEach(row => {
                 const key = `${row.Date.getFullYear()}-${String(row.Date.getMonth() + 1).padStart(2, '0')}`;
                 if (!monthly[key]) {
-                    monthly[key] = { assets: row.Total_Assets, change: 0 };
+                    monthly[key] = { lastAssets: row.Total_Assets };
                 }
-                monthly[key].assets = row.Total_Assets;
+                monthly[key].lastAssets = row.Total_Assets;
             });
             
             const keys = Object.keys(monthly).sort();
             const result = [];
+            let prevAssets = null;
             for (let i = 0; i < keys.length; i++) {
-                const change = i > 0 ? monthly[keys[i]].assets - monthly[keys[i-1]].assets : 0;
+                const change = prevAssets !== null ? monthly[keys[i]].lastAssets - prevAssets : 0;
                 result.push({ month: keys[i], change: change });
+                prevAssets = monthly[keys[i]].lastAssets;
             }
             return result;
         }
 
         function calculateSeasonalData(df) {
-            const seasonData = {};
-            df.forEach(row => {
-                const year = row.Date.getFullYear();
-                const month = row.Date.getMonth() + 1;
-                const key = `${year}-${month}`;
-                if (!seasonData[key]) {
-                    seasonData[key] = { year, month, change: 0 };
-                }
+            const monthly = calculateMonthlyData(df);
+            const matrix = {};
+            
+            monthly.forEach(m => {
+                const [year, month] = m.month.split('-');
+                if (!matrix[year]) matrix[year] = {};
+                matrix[year][parseInt(month)] = m.change / 1000;
             });
             
-            const sorted = df.sort((a, b) => a.Date - b.Date);
-            for (let i = 1; i < sorted.length; i++) {
-                const curr = sorted[i];
-                const prev = sorted[i-1];
-                const currKey = `${curr.Date.getFullYear()}-${curr.Date.getMonth() + 1}`;
-                const prevKey = `${prev.Date.getFullYear()}-${prev.Date.getMonth() + 1}`;
-                
-                if (currKey !== prevKey) {
-                    if (seasonData[currKey]) {
-                        seasonData[currKey].change += curr.Change;
-                    }
+            return matrix;
+        }
+
+        function calculateYearlyVelocity(df) {
+            const yearly = {};
+            df.forEach(row => {
+                const year = row.Date.getFullYear();
+                if (!yearly[year]) {
+                    yearly[year] = { first: row.Total_Assets, last: row.Total_Assets, firstDate: row.Date, lastDate: row.Date };
                 }
-            }
+                yearly[year].last = row.Total_Assets;
+                yearly[year].lastDate = row.Date;
+            });
             
+            const result = [];
+            Object.keys(yearly).sort().forEach(year => {
+                const y = yearly[year];
+                const days = Math.max(1, Math.floor((y.lastDate - y.firstDate) / (24 * 60 * 60 * 1000)));
+                const growth = y.last - y.first;
+                if (days > 0) {
+                    result.push({ year: String(year), velocity: growth / days, growth });
+                }
+            });
+            return result;
+        }
+
+        function calculateSeasonalData(df) {
+            const monthly = calculateMonthlyData(df);
             const matrix = {};
-            Object.values(seasonData).forEach(d => {
-                if (!matrix[d.year]) matrix[d.year] = {};
-                matrix[d.year][d.month] = d.change / 1000;
+            
+            monthly.forEach(m => {
+                const [year, month] = m.month.split('-');
+                if (!matrix[year]) matrix[year] = {};
+                matrix[year][parseInt(month)] = m.change / 1000;
             });
             
             return matrix;
