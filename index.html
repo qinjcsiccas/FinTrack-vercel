@@ -701,7 +701,7 @@
                 x: monthlyData.map(d => d.month),
                 y: monthlyData.map(d => d.change),
                 type: 'bar',
-                marker: { color },
+                marker: { color: colors },
                 name: '净盈亏'
             };
             
@@ -795,9 +795,8 @@
                 type: 'bar',
                 orientation: 'h',
                 marker: { 
-                    color: sortedTags.map(d => d[1]),
-                    colorscale: 'RdBu',
-                    colormid: 0
+                    // ✅ 修复：收入(>=0)强制为红色 #f44336，支出(<0)强制为蓝色 #2196F3
+                    color: sortedTags.map(d => d[1] >= 0 ? '#f44336' : '#2196F3') 
                 },
                 name: '净额'
             };
@@ -808,8 +807,7 @@
                 xaxis: { 
                     title: state.privacyMode ? '****' : '净额 (元)',
                     showticklabels: !state.privacyMode
-                },
-                height: 600
+                }
             };
             
             Plotly.newPlot('category-chart', [traceCat], layoutCat, { displayModeBar: false, responsive: true });
