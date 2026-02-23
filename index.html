@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jincheng's 财务看板</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            overflow-x: auto;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .tab {
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 0.95rem;
+            color: #666;
+            white-space: nowrap;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: 600;
+        }
+        .tab:hover {
+            background: #f8f9fa;
+        }
+        .content {
+            padding: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        .card h3 {
+            font-size: 1rem;
+            margin: 1rem 0 0.5rem;
+            color: #555;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .kpi-item {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .kpi-label {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 0.25rem;
+        }
+        .kpi-value {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+        }
+        .kpi-delta {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 0.4rem;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+        .btn {
+            padding: 0.7rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a6fd6;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .milestone-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            align-items: center;
+        }
+        .milestone-row input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .milestone-row .btn-remove {
+            background: #ff6b6b;
+            color: white;
+            padding: 0.5rem 0.8rem;
+        }
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: #ddd;
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle.active {
+            background: #667eea;
+        }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+        .toggle.active::after {
+            left: 24px;
+        }
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin: 1rem 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .data-table th, .data-table td {
+            padding: 0.6rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .table-container {
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .welcome-msg {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+        .welcome-msg h2 {
+            margin-bottom: 1rem;
+        }
+        .info-box {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .info-box.info {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .info-box.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .info-box.warning {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        .hidden {
+            display: none;
+        }
+        .heatmap-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 个人财务看板</h1>
+        <div id="header-subtitle">目标: ¥1,000,000</div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="settings">⚙️ 设置</button>
+        <button class="tab" data-tab="trend">📈 趋势</button>
+        <button class="tab" data-tab="velocity">⏱️ 速率</button>
+        <button class="tab" data-tab="category">💰 分类</button>
+        <button class="tab" data-tab="forecast">🏆 预测</button>
+    </div>
+
+    <div class="content">
+        <div id="welcome-panel" class="welcome-msg hidden">
+            <h2>👋 欢迎！</h2>
+            <p>请点击上方的 <strong>⚙️ 设置</strong> 标签页来绑定数据</p>
+        </div>
+
+        <div id="tab-settings" class="tab-content">
+            <div class="card">
+                <h2>1. 数据源配置</h2>
+                <div class="form-group">
+                    <label>🌐 云端链接 (Google Sheet CSV)</label>
+                    <input type="text" id="csv-url" placeholder="https://docs.google.com/.../pub?output=csv">
+                </div>
+                <div class="form-group">
+                    <label>📂 或上传本地 CSV 文件 (优先级最高)</label>
+                    <input type="file" id="csv-file" accept=".csv">
+                </div>
+                <button class="btn btn-primary" id="load-data-btn">加载数据</button>
+                <button class="btn btn-secondary" id="refresh-btn">🔄 刷新云端数据</button>
+                <div id="data-source-info" class="info-box info hidden"></div>
+            </div>
+
+            <div class="card">
+                <h2>2. 职业/生活里程碑</h2>
+                <div id="milestones-container"></div>
+                <button class="btn btn-secondary" id="add-milestone-btn">+ 添加里程碑</button>
+            </div>
+
+            <div class="card">
+                <h2>3. 目标与显示</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>记账起始日</label>
+                        <input type="date" id="start-date" value="2023-02-25">
+                    </div>
+                    <div class="form-group">
+                        <label>目标金额 (元)</label>
+                        <input type="number" id="target-goal" value="1000000" step="100000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>进阶步长 (元)</label>
+                        <input type="number" id="velocity-step" value="100000" step="10000">
+                    </div>
+                    <div class="form-group">
+                        <label>👁️ 隐私模式 (隐藏金额)</label>
+                        <div class="toggle-group">
+                            <div class="toggle" id="privacy-toggle"></div>
+                            <span id="privacy-label">关闭</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="main-content" class="hidden">
+            <div id="kpi-section"></div>
+
+            <div id="tab-trend" class="tab-content hidden">
+                <div class="card">
+                    <h2>📈 资产演变趋势</h2>
+                    <div id="trend-chart" class="chart-container"></div>
+                </div>
+                <div class="card">
+                    <h2>🌔 月度净盈亏</h2>
+                    <div id="monthly-chart" class="chart-container"></div>
+                </div>
+            </div>
+
+            <div id="tab-velocity" class="tab-content hidden">
+                <div class="card">
+                    <h2>⏱️ 财富进阶速率</h2>
+                    <div id="velocity-chart" class="chart-container"></div>
+                </div>
+                <div class="card">
+                    <h2>🗓️ 年度平均存钱速率</h2>
+                    <div id="yearly-chart" class="chart-container"></div>
+                </div>
+            </div>
+
+            <div id="tab-category" class="tab-content hidden">
+                <div class="card">
+                    <h2>📊 账目分类统计</h2>
+                    <div id="category-chart" class="chart-container"></div>
+                </div>
+                <div class="card">
+                    <div class="form-row">
+                        <div>
+                            <h3>📈 收入 Top 10</h3>
+                            <div class="table-container">
+                                <table class="data-table" id="income-table">
+                                    <thead><tr><th>日期</th><th>金额</th><th>备注</th><th>标签</th></tr></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div>
+                            <h3>💸 支出 Top 10</h3>
+                            <div class="table-container">
+                                <table class="data-table" id="expense-table">
+                                    <thead><tr><th>日期</th><th>金额</th><th>备注</th><th>标签</th></tr></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-forecast" class="tab-content hidden">
+                <div class="card">
+                    <h2 id="forecast-title">🚀 里程碑预测</h2>
+                    <div id="forecast-result"></div>
+                </div>
+                <div class="card">
+                    <h2>🔥 季节性热力图 (单位: k)</h2>
+                    <div class="heatmap-container">
+                        <div id="heatmap-chart" class="chart-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            df: null,
+            milestones: [{ date: '2023-06-14', label: '公司A' }],
+            startDate: new Date('2023-02-25'),
+            targetGoal: 1000000,
+            velocityStep: 100000,
+            privacyMode: false,
+            dataLoaded: false
+        };
+
+        function fmtMoney(val) {
+            if (state.privacyMode) return '****';
+            return '¥' + val.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+        }
+
+        function parseCSV(csvText) {
+            const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+            const data = result.data.map(row => ({
+                Day: parseFloat(row.Day) || 0,
+                Bank: parseFloat(row.Bank) || 0,
+                Invest: parseFloat(row.Invest) || 0,
+                Notes: row.Notes || ''
+            }));
+            
+            const baseDate = new Date(state.startDate);
+            data.forEach(row => {
+                const date = new Date(baseDate);
+                date.setDate(date.getDate() + row.Day);
+                row.Date = date;
+                row.Total_Assets = row.Bank + row.Invest;
+                row.Change = 0;
+            });
+            
+            for (let i = 1; i < data.length; i++) {
+                data[i].Change = data[i].Total_Assets - data[i-1].Total_Assets;
+            }
+            data[0].Change = 0;
+            
+            data.forEach(row => {
+                const note = (row.Notes || '').trim();
+                const change = row.Change;
+                
+                if (change === 0 && !note) {
+                    row.Tag = '无变动';
+                } else {
+                    const segments = note.split(/[;；]/);
+                    let validCats = [];
+                    for (const s of segments) {
+                        const parts = s.split(/[:：]/);
+                        const cat = parts[0].trim();
+                        if (cat && !['里程碑', '备注', '备忘', '2025', '2026'].includes(cat)) {
+                            validCats.push(cat);
+                        }
+                    }
+                    
+                    if (note.match(/理财|买入|基金|转入/) && Math.abs(change) < 10) {
+                        row.Tag = '资产转移';
+                    } else {
+                        const resTag = validCats[0] || '其他';
+                        const prefix = change > 0 ? '📈 收入:' : '💸 支出:';
+                        row.Tag = prefix + resTag;
+                    }
+                }
+            });
+            
+            const sortedMilestones = [...state.milestones]
+                .map(m => ({ date: new Date(m.date), label: m.label }))
+                .sort((a, b) => a.date - b.date);
+            
+            data.forEach(row => {
+                let currentLabel = '初始阶段';
+                let stageStartDate = sortedMilestones[0] ? sortedMilestones[0].date : row.Date;
+                
+                for (const m of sortedMilestones) {
+                    if (row.Date >= m.date) {
+                        currentLabel = m.label;
+                        stageStartDate = m.date;
+                    } else {
+                        break;
+                    }
+                }
+                
+                const yearsPassed = Math.floor((row.Date - stageStartDate) / (365 * 24 * 60 * 60 * 1000));
+                row.Stage = `${currentLabel} (第${yearsPassed + 1}年)`;
+            });
+            
+            return data;
+        }
+
+        function calculateMonthlyData(df) {
+            const monthly = {};
+            df.forEach(row => {
+                const key = `${row.Date.getFullYear()}-${String(row.Date.getMonth() + 1).padStart(2, '0')}`;
+                if (!monthly[key]) {
+                    monthly[key] = { assets: row.Total_Assets, change: 0 };
+                }
+                monthly[key].assets = row.Total_Assets;
+            });
+            
+            const keys = Object.keys(monthly).sort();
+            const result = [];
+            for (let i = 0; i < keys.length; i++) {
+                const change = i > 0 ? monthly[keys[i]].assets - monthly[keys[i-1]].assets : 0;
+                result.push({ month: keys[i], change: change });
+            }
+            return result;
+        }
+
+        function calculateSeasonalData(df) {
+            const seasonData = {};
+            df.forEach(row => {
+                const year = row.Date.getFullYear();
+                const month = row.Date.getMonth() + 1;
+                const key = `${year}-${month}`;
+                if (!seasonData[key]) {
+                    seasonData[key] = { year, month, change: 0 };
+                }
+            });
+            
+            const sorted = df.sort((a, b) => a.Date - b.Date);
+            for (let i = 1; i < sorted.length; i++) {
+                const curr = sorted[i];
+                const prev = sorted[i-1];
+                const currKey = `${curr.Date.getFullYear()}-${curr.Date.getMonth() + 1}`;
+                const prevKey = `${prev.Date.getFullYear()}-${prev.Date.getMonth() + 1}`;
+                
+                if (currKey !== prevKey) {
+                    if (seasonData[currKey]) {
+                        seasonData[currKey].change += curr.Change;
+                    }
+                }
+            }
+            
+            const matrix = {};
+            Object.values(seasonData).forEach(d => {
+                if (!matrix[d.year]) matrix[d.year] = {};
+                matrix[d.year][d.month] = d.change / 1000;
+            });
+            
+            return matrix;
+        }
+
+        function calculateVelocity(df, step) {
+            const result = [];
+            const minVal = Math.min(...df.map(r => r.Total_Assets));
+            const maxVal = Math.max(...df.map(r => r.Total_Assets));
+            let currentTarget = (Math.floor(minVal / step) + 1) * step;
+            let lastDate = df[0].Date;
+            
+            const sorted = [...df].sort((a, b) => a.Date - b.Date);
+            
+            while (currentTarget <= maxVal) {
+                const reachRow = sorted.find(r => r.Total_Assets >= currentTarget);
+                if (reachRow) {
+                    const daysTaken = Math.max(1, Math.floor((reachRow.Date - lastDate) / (24 * 60 * 60 * 1000)));
+                    result.push({
+                        milestone: state.privacyMode ? '****' : `${Math.floor(currentTarget / 10000)}w`,
+                        days: daysTaken,
+                        date: reachRow.Date.toISOString().split('T')[0]
+                    });
+                    lastDate = reachRow.Date;
+                    currentTarget += step;
+                } else {
+                    break;
+                }
+            }
+            return result;
+        }
+
+        function calculateYearlyVelocity(df) {
+            const yearly = {};
+            df.forEach(row => {
+                const year = row.Date.getFullYear();
+                if (!yearly[year]) {
+                    yearly[year] = { first: row.Total_Assets, last: row.Total_Assets, firstDate: row.Date, lastDate: row.Date };
+                }
+                yearly[year].last = row.Total_Assets;
+                yearly[year].lastDate = row.Date;
+            });
+            
+            const result = [];
+            Object.keys(yearly).sort().forEach(year => {
+                const y = yearly[year];
+                const days = Math.max(1, Math.floor((y.lastDate - y.firstDate) / (24 * 60 * 60 * 1000)));
+                const growth = y.last - y.first;
+                if (days > 0 && growth !== 0) {
+                    result.push({ year: String(year), velocity: growth / days, growth });
+                }
+            });
+            return result;
+        }
+
+        function updateKPIs() {
+            if (!state.df || state.df.length === 0) return;
+            
+            const currTotal = state.df[state.df.length - 1].Total_Assets;
+            const currStage = state.df[state.df.length - 1].Stage;
+            const lastChange = state.df[state.df.length - 1].Change;
+            
+            const oneYearAgo = new Date(state.df[state.df.length - 1].Date);
+            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+            const recentYearData = state.df.filter(r => r.Date >= oneYearAgo);
+            
+            let displayVelocity = 0;
+            if (recentYearData.length > 1) {
+                const recentGrowth = recentYearData[recentYearData.length - 1].Total_Assets - recentYearData[0].Total_Assets;
+                const recentDays = Math.max(1, Math.floor((recentYearData[recentYearData.length - 1].Date - recentYearData[0].Date) / (24 * 60 * 60 * 1000)));
+                displayVelocity = recentGrowth / recentDays;
+            }
+            
+            const bankRatio = (state.df[state.df.length - 1].Bank / currTotal) * 100;
+            
+            document.getElementById('header-subtitle').textContent = `目标: ${fmtMoney(state.targetGoal)}`;
+            
+            const kpiHtml = `
+                <div class="kpi-grid">
+                    <div class="kpi-item">
+                        <div class="kpi-label">当前总资产</div>
+                        <div class="kpi-value">${fmtMoney(currTotal)}</div>
+                        <div class="kpi-delta">最新: ${state.privacyMode ? '****' : (lastChange >= 0 ? '+' : '') + lastChange.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-label">当前阶段</div>
+                        <div class="kpi-value" style="font-size: 1.1rem">${currStage}</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-label">近365日均积累</div>
+                        <div class="kpi-value">${state.privacyMode ? '****' : '¥' + displayVelocity.toLocaleString('zh-CN', { maximumFractionDigits: 1 }) + '/天'}</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-label">现金占比</div>
+                        <div class="kpi-value">${bankRatio.toFixed(1)}%</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('kpi-section').innerHTML = kpiHtml;
+        }
+
+        function renderTrendCharts() {
+            if (!state.df || state.df.length === 0) return;
+            
+            const trace1 = {
+                x: state.df.map(r => r.Date),
+                y: state.df.map(r => r.Bank),
+                name: '银行',
+                fill: 'tozeroy',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#7fb3d5' }
+            };
+            
+            const trace2 = {
+                x: state.df.map(r => r.Date),
+                y: state.df.map(r => r.Invest),
+                name: '投资',
+                fill: 'tozeroy',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#5b5ea6' }
+            };
+            
+            const layout = {
+                margin: { l: 0, r: 0, t: 30, b: 0 },
+                legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center' },
+                xaxis: { fixedrange: state.privacyMode },
+                yaxis: { 
+                    fixedrange: state.privacyMode,
+                    showticklabels: !state.privacyMode,
+                    title: state.privacyMode ? '****' : '金额 (元)'
+                },
+                hovermode: 'x unified'
+            };
+            
+            const config = { displayModeBar: false, responsive: true };
+            
+            Plotly.newPlot('trend-chart', [trace1, trace2], layout, config);
+            
+            const monthlyData = calculateMonthlyData(state.df);
+            const colors = monthlyData.map(d => d.change >= 0 ? '#4caf50' : '#f44336');
+            
+            const traceMonthly = {
+                x: monthlyData.map(d => d.month),
+                y: monthlyData.map(d => state.privacyMode ? 0 : d.change),
+                type: 'bar',
+                marker: { color },
+                name: '净盈亏'
+            };
+            
+            const layoutMonthly = {
+                margin: { l: 0, r: 0, t: 30, b: 40 },
+                xaxis: { title: '月份' },
+                yaxis: { 
+                    showticklabels: !state.privacyMode,
+                    title: state.privacyMode ? '****' : '净盈亏 (元)'
+                },
+                hovermode: 'closest'
+            };
+            
+            Plotly.newPlot('monthly-chart', [traceMonthly], layoutMonthly, config);
+        }
+
+        function renderVelocityCharts() {
+            if (!state.df || state.df.length === 0) return;
+            
+            const velocityData = calculateVelocity(state.df, state.velocityStep);
+            
+            if (velocityData.length > 0) {
+                const traceV = {
+                    x: velocityData.map(d => d.milestone),
+                    y: velocityData.map(d => d.days),
+                    type: 'bar',
+                    text: velocityData.map(d => state.privacyMode ? '****' : d.days),
+                    textposition: 'outside',
+                    marker: { color: velocityData.map(d => d.days), colorscale: 'RdYlBu_r' },
+                    name: '所用天数'
+                };
+                
+                const layoutV = {
+                    margin: { l: 0, r: 0, t: 30, b: 40 },
+                    xaxis: { title: '资产里程碑' },
+                    yaxis: { 
+                        title: '耗时 (天)',
+                        showticklabels: !state.privacyMode
+                    }
+                };
+                
+                Plotly.newPlot('velocity-chart', [traceV], layoutV, { displayModeBar: false, responsive: true });
+            } else {
+                document.getElementById('velocity-chart').innerHTML = '<p style="text-align:center;color:#888;padding:2rem;">数据跨度不足</p>';
+            }
+            
+            const yearlyData = calculateYearlyVelocity(state.df);
+            
+            if (yearlyData.length > 0) {
+                const traceY = {
+                    x: yearlyData.map(d => d.year),
+                    y: yearlyData.map(d => state.privacyMode ? 0 : d.velocity),
+                    type: 'bar',
+                    text: yearlyData.map(d => state.privacyMode ? '****' : d.velocity.toFixed(1)),
+                    textposition: 'outside',
+                    marker: { color: yearlyData.map(d => d.velocity), colorscale: 'GnBu' },
+                    name: '日均增长'
+                };
+                
+                const layoutY = {
+                    margin: { l: 0, r: 0, t: 30, b: 40 },
+                    xaxis: { title: '年份', dtick: 1 },
+                    yaxis: { 
+                        title: state.privacyMode ? '****' : '日均增长 (元/天)',
+                        showticklabels: !state.privacyMode
+                    }
+                };
+                
+                Plotly.newPlot('yearly-chart', [traceY], layoutY, { displayModeBar: false, responsive: true });
+            }
+        }
+
+        function renderCategoryCharts() {
+            if (!state.df || state.df.length === 0) return;
+            
+            const tagStats = {};
+            state.df.forEach(row => {
+                if (row.Change !== 0) {
+                    if (!tagStats[row.Tag]) tagStats[row.Tag] = 0;
+                    tagStats[row.Tag] += row.Change;
+                }
+            });
+            
+            const sortedTags = Object.entries(tagStats)
+                .sort((a, b) => a[1] - b[1])
+                .slice(0, 20);
+            
+            const traceCat = {
+                y: sortedTags.map(d => d[0]),
+                x: sortedTags.map(d => state.privacyMode ? 0 : d[1]),
+                type: 'bar',
+                orientation: 'h',
+                marker: { 
+                    color: sortedTags.map(d => d[1]),
+                    colorscale: 'RdBu',
+                    colormid: 0
+                },
+                name: '净额'
+            };
+            
+            const layoutCat = {
+                margin: { l: 150, r: 0, t: 30, b: 0 },
+                yaxis: { title: '分类' },
+                xaxis: { 
+                    title: state.privacyMode ? '****' : '净额 (元)',
+                    showticklabels: !state.privacyMode
+                },
+                height: 600
+            };
+            
+            Plotly.newPlot('category-chart', [traceCat], layoutCat, { displayModeBar: false, responsive: true });
+            
+            const incomeData = state.df
+                .filter(r => r.Change > 0)
+                .sort((a, b) => b.Change - a.Change)
+                .slice(0, 10);
+            
+            const expenseData = state.df
+                .filter(r => r.Change < 0)
+                .sort((a, b) => a.Change - b.Change)
+                .slice(0, 10);
+            
+            const formatRow = (r) => {
+                const date = r.Date.toISOString().split('T')[0];
+                const change = state.privacyMode ? '****' : (r.Change >= 0 ? '+' : '') + r.Change.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+                return `<tr><td>${date}</td><td>${change}</td><td>${r.Notes || '-'}</td><td>${r.Tag}</td></tr>`;
+            };
+            
+            document.querySelector('#income-table tbody').innerHTML = incomeData.map(formatRow).join('');
+            document.querySelector('#expense-table tbody').innerHTML = expenseData.map(formatRow).join('');
+        }
+
+        function renderForecastCharts() {
+            if (!state.df || state.df.length === 0) return;
+            
+            const currStage = state.df[state.df.length - 1].Stage;
+            document.getElementById('forecast-title').textContent = `🚀 基于【${currStage}】的里程碑预测`;
+            
+            const stageData = state.df.filter(r => r.Stage === currStage);
+            let stageVelocity = 0;
+            
+            if (stageData.length > 1) {
+                const stageGrowth = stageData[stageData.length - 1].Total_Assets - stageData[0].Total_Assets;
+                const stageDays = Math.max(1, Math.floor((stageData[stageData.length - 1].Date - stageData[0].Date) / (24 * 60 * 60 * 1000)));
+                stageVelocity = stageGrowth / stageDays;
+            }
+            
+            const currTotal = state.df[state.df.length - 1].Total_Assets;
+            const remaining = state.targetGoal - currTotal;
+            const resultDiv = document.getElementById('forecast-result');
+            
+            if (stageVelocity > 0 && remaining > 0) {
+                const daysNeeded = remaining / stageVelocity;
+                const predDate = new Date();
+                predDate.setDate(predDate.getDate() + daysNeeded);
+                
+                resultDiv.innerHTML = `
+                    <div class="info-box success">
+                        <strong>🎯 距离目标 ${fmtMoney(state.targetGoal)} 还差 ${fmtMoney(remaining)}</strong>
+                    </div>
+                    <p>当前阶段 (<strong>${currStage}</strong>) 平均增速：<strong>${fmtMoney(stageVelocity)} / 天</strong></p>
+                    <div class="info-box info">
+                        <strong>📅 预计达成日期：${predDate.toISOString().split('T')[0]} (约需 ${Math.floor(daysNeeded)} 天)</strong>
+                    </div>
+                `;
+            } else if (remaining <= 0) {
+                resultDiv.innerHTML = `
+                    <div class="info-box success">
+                        <strong>🎉 恭喜！您已达成目标！</strong>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="info-box warning">
+                        <strong>⚠️ 当前阶段暂无正向增长数据，无法预测。</strong>
+                    </div>
+                `;
+            }
+            
+            const seasonalData = calculateSeasonalData(state.df);
+            const years = Object.keys(seasonalData).sort();
+            const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+            
+            const zData = months.map(m => {
+                return years.map(y => seasonalData[y] ? (seasonalData[y][m] || 0) : 0);
+            });
+            
+            const traceHeat = {
+                z: zData,
+                x: months,
+                y: years,
+                type: 'heatmap',
+                colorscale: 'RdYlGn',
+                text: state.privacyMode ? '' : zData.map(row => row.map(v => v.toFixed(1))),
+                texttemplate: state.privacyMode ? '' : '%{text}',
+                showscale: !state.privacyMode
+            };
+            
+            const layoutHeat = {
+                margin: { l: 50, r: 0, t: 30, b: 40 },
+                xaxis: { title: '月份', dtick: 1 },
+                yaxis: { title: '年份', dtick: 1 }
+            };
+            
+            Plotly.newPlot('heatmap-chart', [traceHeat], layoutHeat, { displayModeBar: false, responsive: true });
+        }
+
+        function renderAllCharts() {
+            if (!state.dataLoaded) return;
+            updateKPIs();
+            renderTrendCharts();
+            renderVelocityCharts();
+            renderCategoryCharts();
+            renderForecastCharts();
+        }
+
+        function loadDataFromSource(source) {
+            const infoDiv = document.getElementById('data-source-info');
+            
+            if (source instanceof File) {
+                infoDiv.className = 'info-box info';
+                infoDiv.textContent = '✅ 模式：正在使用本地上传文件';
+                infoDiv.classList.remove('hidden');
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    state.df = parseCSV(e.target.result);
+                    state.dataLoaded = true;
+                    showMainContent();
+                    renderAllCharts();
+                };
+                reader.readAsText(source);
+            } else if (typeof source === 'string' && source.startsWith('http')) {
+                infoDiv.className = 'info-box success';
+                infoDiv.textContent = '☁️ 模式：正在使用云端链接';
+                infoDiv.classList.remove('hidden');
+                
+                fetch(source)
+                    .then(res => res.text())
+                    .then(csv => {
+                        state.df = parseCSV(csv);
+                        state.dataLoaded = true;
+                        showMainContent();
+                        renderAllCharts();
+                    })
+                    .catch(err => {
+                        infoDiv.className = 'info-box warning';
+                        infoDiv.textContent = '⚠️ 加载失败: ' + err.message;
+                    });
+            }
+        }
+
+        function showMainContent() {
+            document.getElementById('welcome-panel').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+        }
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+            });
+        });
+
+        document.getElementById('privacy-toggle').addEventListener('click', function() {
+            this.classList.toggle('active');
+            state.privacyMode = this.classList.contains('active');
+            document.getElementById('privacy-label').textContent = state.privacyMode ? '开启' : '关闭';
+            renderAllCharts();
+        });
+
+        document.getElementById('add-milestone-btn').addEventListener('click', () => {
+            state.milestones.push({ date: '2024-01-01', label: '新阶段' });
+            renderMilestones();
+        });
+
+        function renderMilestones() {
+            const container = document.getElementById('milestones-container');
+            container.innerHTML = state.milestones.map((m, i) => `
+                <div class="milestone-row">
+                    <input type="date" value="${m.date}" data-index="${i}" class="ms-date">
+                    <input type="text" value="${m.label}" data-index="${i}" class="ms-label" placeholder="阶段名称">
+                    ${state.milestones.length > 1 ? `<button class="btn btn-remove" data-index="${i}">×</button>` : ''}
+                </div>
+            `).join('');
+            
+            container.querySelectorAll('.ms-date').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    state.milestones[parseInt(e.target.dataset.index)].date = e.target.value;
+                });
+            });
+            
+            container.querySelectorAll('.ms-label').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    state.milestones[parseInt(e.target.dataset.index)].label = e.target.value;
+                });
+            });
+            
+            container.querySelectorAll('.btn-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    state.milestones.splice(parseInt(e.target.dataset.index), 1);
+                    renderMilestones();
+                });
+            });
+        }
+
+        renderMilestones();
+
+        document.getElementById('load-data-btn').addEventListener('click', () => {
+            const fileInput = document.getElementById('csv-file');
+            const urlInput = document.getElementById('csv-url');
+            
+            state.startDate = new Date(document.getElementById('start-date').value);
+            state.targetGoal = parseFloat(document.getElementById('target-goal').value) || 1000000;
+            state.velocityStep = parseFloat(document.getElementById('velocity-step').value) || 100000;
+            
+            if (fileInput.files.length > 0) {
+                loadDataFromSource(fileInput.files[0]);
+            } else if (urlInput.value) {
+                loadDataFromSource(urlInput.value);
+            } else {
+                alert('请输入链接或上传文件');
+            }
+        });
+
+        document.getElementById('refresh-btn').addEventListener('click', () => {
+            const urlInput = document.getElementById('csv-url');
+            if (urlInput.value) {
+                loadDataFromSource(urlInput.value);
+            }
+        });
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('csv_url')) {
+            document.getElementById('csv-url').value = urlParams.get('csv_url');
+        }
+        if (urlParams.get('label')) {
+            state.milestones[0].label = urlParams.get('label');
+            renderMilestones();
+        }
+    </script>
+</body>
+</html>
