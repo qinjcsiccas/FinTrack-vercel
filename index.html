@@ -357,7 +357,7 @@
                 </div>
                 <div class="card">
                     <div class="form-row">
-                        <div>
+                        <div style="min-width:0;">
                             <h3>📈 收入 Top 10</h3>
                             <div class="table-container">
                                 <table class="data-table" id="income-table">
@@ -366,7 +366,7 @@
                                 </table>
                             </div>
                         </div>
-                        <div>
+                        <div style="min-width:0;">
                             <h3>💸 支出 Top 10</h3>
                             <div class="table-container">
                                 <table class="data-table" id="expense-table">
@@ -674,7 +674,7 @@
             };
             
             const layout = {
-                margin: { l: 0, r: 0, t: 30, b: 0 },
+                margin: { l: 70, r: 10, t: 30, b: 40 },
                 legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center' },
                 xaxis: { fixedrange: state.privacyMode },
                 yaxis: { 
@@ -706,7 +706,7 @@
             };
             
             const layoutMonthly = {
-                margin: { l: 50, r: 20, t: 30, b: 40 },
+                margin: { l: 70, r: 20, t: 30, b: 50 },
                 xaxis: { title: '月份' },
                 yaxis: { 
                     title: '净盈亏 (元)'
@@ -735,7 +735,7 @@
                 };
                 
                 const layoutV = {
-                    margin: { l: 0, r: 0, t: 30, b: 40 },
+                    margin: { l: 70, r: 20, t: 30, b: 50 },
                     xaxis: { title: '资产里程碑' },
                     yaxis: { 
                         title: '耗时 (天)',
@@ -762,7 +762,7 @@
                 };
                 
                 const layoutY = {
-                    margin: { l: 0, r: 0, t: 30, b: 40 },
+                    margin: { l: 80, r: 20, t: 30, b: 50 },
                     xaxis: { title: '年份', dtick: 1 },
                     yaxis: { 
                         title: state.privacyMode ? '****' : '日均增长 (元/天)',
@@ -803,7 +803,7 @@
             };
             
             const layoutCat = {
-                margin: { l: 150, r: 0, t: 30, b: 0 },
+                margin: { l: 150, r: 20, t: 30, b: 50 },
                 yaxis: { title: '分类' },
                 xaxis: { 
                     title: state.privacyMode ? '****' : '净额 (元)',
@@ -901,7 +901,7 @@
             };
             
             const layoutHeat = {
-                margin: { l: 50, r: 0, t: 30, b: 40 },
+                margin: { l: 60, r: 20, t: 30, b: 50 },
                 xaxis: { title: '月份', dtick: 1 },
                 yaxis: { title: '年份', dtick: 1 }
             };
