@@ -690,6 +690,7 @@
             Plotly.newPlot('trend-chart', [trace1, trace2], layout, config);
             
             const monthlyData = calculateMonthlyData(state.df);
+            console.log('monthlyData:', monthlyData);
             const colors = monthlyData.map(d => d.change >= 0 ? '#4caf50' : '#f44336');
             
             const traceMonthly = {
@@ -701,7 +702,7 @@
             };
             
             const layoutMonthly = {
-                margin: { l: 0, r: 0, t: 30, b: 40 },
+                margin: { l: 40, r: 0, t: 30, b: 40 },
                 xaxis: { title: '月份' },
                 yaxis: { 
                     showticklabels: !state.privacyMode,
@@ -717,6 +718,7 @@
             if (!state.df || state.df.length === 0) return;
             
             const velocityData = calculateVelocity(state.df, state.velocityStep);
+            console.log('velocityData:', velocityData);
             
             if (velocityData.length > 0) {
                 const traceV = {
@@ -744,6 +746,7 @@
             }
             
             const yearlyData = calculateYearlyVelocity(state.df);
+            console.log('yearlyData:', yearlyData);
             
             if (yearlyData.length > 0) {
                 const traceY = {
@@ -779,10 +782,12 @@
                     tagStats[row.Tag] += row.Change;
                 }
             });
+            console.log('tagStats:', tagStats);
             
             const sortedTags = Object.entries(tagStats)
                 .sort((a, b) => a[1] - b[1])
                 .slice(0, 20);
+            console.log('sortedTags:', sortedTags);
             
             const traceCat = {
                 y: sortedTags.map(d => d[0]),
@@ -834,6 +839,7 @@
             
             const currStage = state.df[state.df.length - 1].Stage;
             document.getElementById('forecast-title').textContent = `🚀 基于【${currStage}】的里程碑预测`;
+            console.log('currStage:', currStage);
             
             const stageData = state.df.filter(r => r.Stage === currStage);
             let stageVelocity = 0;
@@ -843,9 +849,11 @@
                 const stageDays = Math.max(1, Math.floor((stageData[stageData.length - 1].Date - stageData[0].Date) / (24 * 60 * 60 * 1000)));
                 stageVelocity = stageGrowth / stageDays;
             }
+            console.log('stageVelocity:', stageVelocity);
             
             const currTotal = state.df[state.df.length - 1].Total_Assets;
             const remaining = state.targetGoal - currTotal;
+            console.log('currTotal:', currTotal, 'remaining:', remaining);
             const resultDiv = document.getElementById('forecast-result');
             
             if (stageVelocity > 0 && remaining > 0) {
@@ -877,6 +885,7 @@
             }
             
             const seasonalData = calculateSeasonalData(state.df);
+            console.log('seasonalData:', seasonalData);
             const years = Object.keys(seasonalData).sort();
             const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
             
@@ -952,6 +961,18 @@
         function showMainContent() {
             document.getElementById('welcome-panel').classList.add('hidden');
             document.getElementById('main-content').classList.remove('hidden');
+            
+            // 加载数据后默认显示趋势标签页
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            
+            const trendTab = document.getElementById('tab-trend');
+            trendTab.classList.remove('hidden');
+            document.querySelector('.tab[data-tab="trend"]').classList.add('active');
+            
+            setTimeout(() => {
+                renderTrendCharts();
+            }, 100);
         }
 
         document.querySelectorAll('.tab').forEach(tab => {
@@ -960,7 +981,16 @@
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
                 
                 tab.classList.add('active');
-                document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+                const targetTab = document.getElementById('tab-' + tab.dataset.tab);
+                targetTab.classList.remove('hidden');
+                
+                // 切换tab后重新绘制该tab的图表
+                setTimeout(() => {
+                    if (tab.dataset.tab === 'trend') renderTrendCharts();
+                    else if (tab.dataset.tab === 'velocity') renderVelocityCharts();
+                    else if (tab.dataset.tab === 'category') renderCategoryCharts();
+                    else if (tab.dataset.tab === 'forecast') renderForecastCharts();
+                }, 100);
             });
         });
 
